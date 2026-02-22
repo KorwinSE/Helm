@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "kafka-standalone.fullname" . }}
+spec:
+  serviceName: "{{ include "kafka-standalone.fullname" . }}"
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "kafka-standalone.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "kafka-standalone.name" . }}
+    spec:
+      containers:
+        - name: kafka
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          ports:
+            - name: broker
+              containerPort: {{ .Values.service.brokerPort }}
+            - name: controller
+              containerPort: {{ .Values.service.controllerPort }}
+          env:
+            - name: CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "kafka-standalone.fullname" . }}-config
+                  key: cluster-id
+            - name: KAFKA_LOG_DIR
+              value: {{ .Values.storage.logDir }}                  
+            - name: KAFKA_METADATA_DIR
+              value: {{ .Values.storage.metadataDir }}                  
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms{{ .Values.javaHeap }} -Xmx{{ .Values.javaHeap }}"      
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: metadata
+              mountPath: /var/lib/kafka/metadata
+            - name: kafka-config
+              mountPath: /opt/kafka/custom-config
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              cd /opt/kafka
+              
+              echo "=== Kafka Standalone KRaft Mode (Custom Config) ==="
+              if [ ! -f ${KAFKA_METADATA_DIR}/meta.properties ]; then
+                echo "Formatting storage..."
+                /opt/kafka/bin/kafka-storage.sh format \
+                  --config /opt/kafka/custom-config/server.properties \
+                  --cluster-id ${CLUSTER_ID} \
+                  --ignore-formatted \
+                  --standalone
+              fi
+              echo "Starting Kafka..."
+              exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/custom-config/server.properties
+      volumes:
+        - name: kafka-config
+          configMap:
+            name: {{ include "kafka-standalone.fullname" . }}-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.storage.dataSize }}
+    - metadata:
+        name: metadata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.storage.metadataSize }}        

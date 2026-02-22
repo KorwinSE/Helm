@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kafka
+description: Apache Kafka KRaft (separated brokers and controllers)
+type: application
+version: 0.1.0
+appVersion: "4.1.1"

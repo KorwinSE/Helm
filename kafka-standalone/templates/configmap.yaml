@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kafka-standalone.fullname" . }}-config
+data:
+  cluster-id: "{{ .Values.clusterId }}"
+  server.properties: |
+    process.roles=broker,controller
+    node.id=1
+    	
+    controller.listener.names=CONTROLLER
+    advertised.listeners=PLAINTEXT://{{ .Values.external.advertisedHost }}:{{ .Values.external.broker.nodePort }}
+    listeners=PLAINTEXT://:{{ .Values.service.brokerPort }},CONTROLLER://:{{ .Values.service.controllerPort }}
+    listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+    inter.broker.listener.name=PLAINTEXT
+
+    controller.quorum.bootstrap.servers={{ include "kafka-standalone.fullname" . }}-0.{{ include "kafka-standalone.fullname" . }}:{{ .Values.service.controllerPort }}
+      	
+    log.dirs={{ .Values.storage.logDir }}
+    metadata.log.dir={{ .Values.storage.metadataDir }}
+
+    socket.request.max.bytes=536870912
+
+    num.partitions=1
+    default.replication.factor=1
+    min.insync.replicas=1
+    
+    offsets.topic.replication.factor=1
+    transaction.state.log.replication.factor=1
+    transaction.state.log.min.isr=1

@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka-broker
+  namespace: {{ .Values.namespace }}
+spec:
+  serviceName: broker
+  replicas: {{ .Values.brokers.replicas }}
+  selector:
+    matchLabels:
+      app: kafka-broker
+  template:
+    metadata:
+      labels:
+        app: kafka-broker
+    spec:
+      initContainers:
+        - name: format-storage
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLUSTER_ID
+              value: {{ .Values.clusterId | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              NODE_ID=$(( ${POD_NAME//[^0-9]/} + 10 ))
+              cp /etc/kafka-config/broker.properties /tmp/server.properties
+              sed -i "s/node.id=/node.id=$NODE_ID/" /tmp/server.properties
+              sed -i "s/POD_NAME/$POD_NAME/" /tmp/server.properties
+
+              if [ ! -f /var/lib/kafka/metadata/meta.properties ]; then
+                /opt/kafka/bin/kafka-storage.sh format \
+                  --cluster-id $CLUSTER_ID \
+                  --config /tmp/server.properties \
+                  --ignore-formatted
+              fi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: metadata
+              mountPath: /var/lib/kafka/metadata
+            - name: kafka-config
+              mountPath: /etc/kafka-config
+            - name: kafka-temp
+              mountPath: /tmp
+
+      containers:
+        - name: kafka
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for controllers..."
+              sleep {{ .Values.init.brokerStartupDelaySeconds }}
+              exec /opt/kafka/bin/kafka-server-start.sh /tmp/server.properties
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: metadata
+              mountPath: /var/lib/kafka/metadata
+            - name: kafka-temp
+              mountPath: /tmp
+
+      volumes:
+        - name: kafka-config
+          configMap:
+            name: kafka-broker-config
+        - name: kafka-temp
+          emptyDir: {}
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.brokers.dataSize }}
+    - metadata:
+        name: metadata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.brokers.metadataSize }}

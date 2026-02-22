@@ -1,0 +1,38 @@
+replicaCount: 3
+
+image:
+  repository: apache/kafka
+  tag: "4.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  name: kafka
+  headlessName: kafka
+  external:
+    enabled: true
+    type: NodePort
+    nodePorts:
+      - 30092
+      - 30093
+      - 30094
+
+storage:
+  size: 1Gi
+
+cluster:
+  id: "QkdO6sJtRkGBg3FzOXKc5w"
+
+serverProperties: |
+  process.roles=broker,controller
+  controller.quorum.voters=0@kafka-0.kafka:9093,1@kafka-1.kafka:9093,2@kafka-2.kafka:9093
+  listeners=PLAINTEXT://:9092,CONTROLLER://:9093
+  advertised.listeners=PLAINTEXT://placeholder:9092
+  listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+  controller.listener.names=CONTROLLER
+  log.dirs=/var/lib/kafka/data
+  num.partitions=1
+  default.replication.factor=3
+  socket.request.max.bytes=536870912
+  min.insync.replicas=2
+  auto.create.topics.enable=true
+

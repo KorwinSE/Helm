@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.headlessName }}
+  labels:
+    app: {{ .Values.service.headlessName }}
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Values.service.headlessName }}
+  ports:
+    - name: broker
+      port: 9092
+    - name: controller
+      port: 9093

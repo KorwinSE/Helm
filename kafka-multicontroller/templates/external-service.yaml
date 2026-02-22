@@ -1,0 +1,20 @@
+{{- if .Values.service.external.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.headlessName }}-external
+  labels:
+    app: {{ .Values.service.headlessName }}
+spec:
+  type: {{ .Values.service.external.type }}
+  selector:
+    app: {{ .Values.service.headlessName }}
+  ports:
+{{- $ports := .Values.service.external.nodePorts }}
+{{- range $i, $p := $ports }}
+    - name: broker-{{ $i }}
+      port: {{ add 9092 (mul $i 10000) | default 9092 }}
+      targetPort: 9092
+      nodePort: {{ $p }}
+{{- end }}
+{{- end }}

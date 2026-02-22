@@ -1,0 +1,39 @@
+replicaCount: 1
+
+image:
+  repository: apache/kafka
+  tag: "4.2.0"
+  pullPolicy: IfNotPresent
+
+service:
+  brokerPort: 9092
+  controllerPort: 9093
+
+storage:
+  dataSize: 1Gi
+  metadataSize: 128Mi
+  logDir: /var/lib/kafka/data
+  metadataDir: /var/lib/kafka/metadata
+
+external:
+  advertisedHost: "192.168.49.2"
+  enabled: true
+  type: NodePort
+  broker:
+    port: 9092
+    nodePort: 30092
+  controller:
+    port: 9093
+    nodePort: 30093  
+
+resources:
+  requests:
+    memory: 5Gi
+    cpu: 500m
+  limits:
+    memory: 5Gi
+    cpu: 2
+
+javaHeap: "4g"
+
+clusterId: "abcdefghijklmnopqrstuv1234567890"

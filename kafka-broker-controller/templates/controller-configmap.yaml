@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-controller-config
+  namespace: {{ .Values.namespace }}
+data:
+  controller.properties: |
+{{ .Values.controllerProperties | indent 4 }}

@@ -1,0 +1,25 @@
+{{- if .Values.external.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafka-standalone.fullname" . }}-external
+spec:
+  type: {{ .Values.external.type }}
+  selector:
+    app: {{ include "kafka-standalone.name" . }}
+  ports:
+    - name: broker
+      port: {{ .Values.external.broker.port }}
+      targetPort: {{ .Values.service.brokerPort }}
+      {{- if eq .Values.external.type "NodePort" }}
+      nodePort: {{ .Values.external.broker.nodePort }}
+      {{- end }}
+
+    - name: controller
+      port: {{ .Values.external.controller.port }}
+      targetPort: {{ .Values.service.controllerPort }}
+      {{- if eq .Values.external.type "NodePort" }}
+      nodePort: {{ .Values.external.controller.nodePort }}
+      {{- end }}
+{{- end }}
+

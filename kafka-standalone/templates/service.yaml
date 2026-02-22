@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafka-standalone.fullname" . }}
+spec:
+  clusterIP: None
+  ports:
+    - name: broker
+      port: {{ .Values.service.brokerPort }}
+      targetPort: {{ .Values.service.brokerPort }}
+    - name: controller
+      port: {{ .Values.service.controllerPort }}
+      targetPort: {{ .Values.service.controllerPort }}
+  selector:
+    app: {{ include "kafka-standalone.name" . }}

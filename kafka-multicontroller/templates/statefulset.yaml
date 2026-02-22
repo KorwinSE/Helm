@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.service.headlessName }}
+  labels:
+    app: {{ .Values.service.headlessName }}
+spec:
+  serviceName: {{ .Values.service.headlessName }}
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app: {{ .Values.service.headlessName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.headlessName }}
+    spec:
+      initContainers:
+        - name: format-storage
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "kafka.fullname" . }}-config
+                  key: cluster-id
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "CLUSTER_ID: $CLUSTER_ID"
+              NODE_ID=${POD_NAME##*-}
+              echo "NODE_ID: $NODE_ID"
+              mkdir -p /tmp/kafka-config
+              cp /etc/kafka-config/server.properties /tmp/kafka-config/server.properties
+              # inject node.id
+              echo "node.id=$NODE_ID" >> /tmp/kafka-config/server.properties
+              # dynamic advertised.listeners using FQDN
+              HOST_FQDN=$(hostname -f)
+              sed -i "s|advertised.listeners=.*|advertised.listeners=PLAINTEXT://$HOST_FQDN:9092|" /tmp/kafka-config/server.properties
+              echo "--- /tmp/kafka-config/server.properties ---"
+              cat /tmp/kafka-config/server.properties
+              if [ ! -f /var/lib/kafka/data/meta.properties ]; then
+                echo "Formatting KRaft storage..."
+                /opt/kafka/bin/kafka-storage.sh format \
+                  --cluster-id $CLUSTER_ID \
+                  --config /tmp/kafka-config/server.properties
+              else
+                echo "Storage already formatted."
+              fi
+              echo "--- meta.properties (if exists) ---"
+              if [ -f /var/lib/kafka/data/meta.properties ]; then cat /var/lib/kafka/data/meta.properties; fi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: kafka-config
+              mountPath: /etc/kafka-config
+            - name: kafka-tmp
+              mountPath: /tmp/kafka-config
+      containers:
+        - name: kafka
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 9092
+              name: broker
+            - containerPort: 9093
+              name: controller
+          readinessProbe:
+            tcpSocket:
+              port: 9093
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          startupProbe:
+            tcpSocket:
+              port: 9093
+            failureThreshold: 30
+            periodSeconds: 1
+          command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Starting Kafka with /tmp/kafka-config/server.properties..."
+              exec /opt/kafka/bin/kafka-server-start.sh /tmp/kafka-config/server.properties
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: kafka-tmp
+              mountPath: /tmp/kafka-config
+      volumes:
+        - name: kafka-config
+          configMap:
+            name: {{ include "kafka.fullname" . }}-config
+            items:
+              - key: server.properties
+                path: server.properties
+        - name: kafka-tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.storage.size }}

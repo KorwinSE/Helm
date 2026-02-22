@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller
+  namespace: {{ .Values.namespace }}
+spec:
+  clusterIP: None
+  selector:
+    app: kafka-controller
+  ports:
+    - name: controller
+      port: 9093

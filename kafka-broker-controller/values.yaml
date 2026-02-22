@@ -1,0 +1,50 @@
+namespace: kafka
+
+image:
+  repository: apache/kafka
+  tag: 4.1.1
+  pullPolicy: IfNotPresent
+
+clusterId: QkdO6sJtRkGBg3FzOXKc5w
+
+brokers:
+  replicas: 3
+  dataSize: 256Mi
+  metadataSize: 64Mi
+
+controllers:
+  replicas: 3
+  metadataSize: 64Mi
+
+init:
+  brokerStartupDelaySeconds: 10
+
+external:
+  enabled: true
+  nodePort: 30092
+
+brokerProperties: |
+  node.id=
+  process.roles=broker
+  listeners=PLAINTEXT://:9092
+  advertised.listeners=PLAINTEXT://POD_NAME.broker.kafka:9092
+  inter.broker.listener.name=PLAINTEXT
+  controller.listener.names=CONTROLLER
+  listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT    
+  controller.quorum.voters=0@kafka-controller-0.controller:9093,1@kafka-controller-1.controller:9093,2@kafka-controller-2.controller:9093
+  log.dirs=/var/lib/kafka/data
+  metadata.log.dir=/var/lib/kafka/metadata
+  num.partitions=1
+  default.replication.factor=3
+  min.insync.replicas=2
+  socket.request.max.bytes=536870912
+  
+controllerProperties: |
+  node.id=
+  process.roles=controller        
+  listeners=CONTROLLER://:9093
+  inter.broker.listener.name=PLAINTEXT
+  controller.listener.names=CONTROLLER
+  controller.quorum.voters=0@kafka-controller-0.controller:9093,1@kafka-controller-1.controller:9093,2@kafka-controller-2.controller:9093
+  metadata.log.dir=/var/lib/kafka/metadata
+  
